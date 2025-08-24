@@ -1,12 +1,16 @@
 use std::error::Error;
 
-use axum::{http::StatusCode, response::IntoResponse, routing::post, serve::Serve, Router};
+use axum::{
+    Router, http::StatusCode, response::IntoResponse, routing::get, routing::get_service,
+    routing::post, serve::Serve,
+};
+use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 pub mod routes;
 
 pub struct Application {
-    server: Serve<Router, Router>,
+    server: Serve<TcpListener, Router, Router>,
     // address is exposed as a public field
     // so we have access to it in tests.
     pub address: String,
@@ -19,7 +23,7 @@ impl Application {
         // We don't need it at this point!
         // DONE
         let router = Router::new()
-            .nest_service("/", ServeDir::new("assets"))
+            .route("/", get_service(ServeDir::new("assets")))
             .route("/signup", post(routes::signup))
             .route("/login", post(routes::login))
             .route("/logout", post(routes::logout))
