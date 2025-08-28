@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, user},
-    services::UserStoreError,
+    domain::{AuthAPIError, UserStoreError, user},
 };
 
 const MIN_PASSWORD_LENGTH: usize = 8;
@@ -23,7 +22,7 @@ pub async fn signup(
     }
     let user = user::User::new(email, password, request.requires_2fa);
     let mut user_store = state.user_store.write().await;
-    if let Err(UserStoreError::UserAlreadyExists) = user_store.add_user(user) {
+    if let Err(UserStoreError::UserAlreadyExists) = user_store.add_user(user).await {
         return Err(AuthAPIError::UserAlreadyExists);
     }
     let response = Json(SignupResponse {
