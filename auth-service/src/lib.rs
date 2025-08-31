@@ -1,8 +1,4 @@
 use app_state::AppState;
-use domain::AuthAPIError;
-use serde::{Deserialize, Serialize};
-use std::error::Error;
-
 use axum::{
     Json, Router,
     http::StatusCode,
@@ -11,6 +7,10 @@ use axum::{
     routing::post,
     serve::Serve,
 };
+use axum_extra::extract::cookie::{Cookie, CookieJar};
+use domain::AuthAPIError;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
@@ -18,6 +18,7 @@ pub mod app_state;
 pub mod domain;
 pub mod routes;
 pub mod services;
+pub mod utils;
 
 #[derive(Serialize, Deserialize)]
 pub struct ErrorResponse {
@@ -44,7 +45,7 @@ impl IntoResponse for AuthAPIError {
 }
 
 pub struct Application {
-    server: Serve<TcpListener, Router, Router>,
+    server: Serve<Router, Router>,
     // address is exposed as a public field
     // so we have access to it in tests.
     pub address: String,
@@ -57,7 +58,7 @@ impl Application {
         // We don't need it at this point!
         // DONE
         let router = Router::new()
-            .route("/", get_service(ServeDir::new("assets")))
+            .nest_service("/", ServeDir::new("assets"))
             .route("/signup", post(routes::signup))
             .route("/login", post(routes::login))
             .route("/logout", post(routes::logout))
