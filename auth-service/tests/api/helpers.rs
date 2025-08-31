@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use auth_service::Application;
+use axum::body::Body;
 use serde_json::json;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -56,11 +57,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_login(&self) -> reqwest::Response {
-        let body = r#"{"email:": "some-email", "password": "some-password""#;
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/login", &self.address))
-            .body(body)
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
