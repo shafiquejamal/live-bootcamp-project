@@ -1,5 +1,22 @@
-use axum::{http::StatusCode, response::IntoResponse};
+use axum::{Json, http::StatusCode, response::IntoResponse};
+use serde::Deserialize;
 
-pub async fn verify_token() -> impl IntoResponse {
-    StatusCode::OK.into_response()
+use crate::{domain::AuthAPIError, utils::validate_token};
+
+pub async fn verify_token(
+    Json(request): Json<VerifyTokenRequest>,
+) -> Result<StatusCode, AuthAPIError> {
+    let token = request.token;
+
+    let token_not_valid = validate_token(&token).await.is_err();
+    if token_not_valid {
+        return Err(AuthAPIError::InvalidToken);
+    }
+
+    Ok(StatusCode::OK)
+}
+
+#[derive(Deserialize)]
+pub struct VerifyTokenRequest {
+    pub token: String,
 }

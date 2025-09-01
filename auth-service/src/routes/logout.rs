@@ -1,5 +1,3 @@
-use std::env::set_var;
-
 use axum::{http::StatusCode, response::IntoResponse};
 use axum_extra::extract::{CookieJar, cookie};
 

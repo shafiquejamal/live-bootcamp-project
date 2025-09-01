@@ -87,7 +87,7 @@ impl TestApp {
     }
 
     pub async fn post_verify_2fa(&self) -> reqwest::Response {
-        let body = r#"{"email:": "some-email", "loginAttemptId": "foo", "2FACode": "bar" "#;
+        let body = "";
         self.http_client
             .post(&format!("{}/verify-2fa", &self.address))
             .body(body)
@@ -96,11 +96,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_verify_token(&self) -> reqwest::Response {
-        let body = r#"{"token:": "some-token""#;
+    pub async fn post_verify_token<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/verify-token", &self.address))
-            .body(body)
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
