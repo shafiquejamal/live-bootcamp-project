@@ -1,23 +1,30 @@
+use auth_service::app_state::BannedTokenStoreType;
 use reqwest::cookie::Jar;
 use std::sync::Arc;
 
 use auth_service::Application;
 use auth_service::utils::constants::test;
-use axum::body::Body;
-use serde_json::json;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
+    pub banned_token_store: BannedTokenStoreType,
     pub http_client: reqwest::Client,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
         let user_store = auth_service::services::HashmapUserStore::new();
-        let app_state = auth_service::app_state::AppState::new(Arc::new(RwLock::new(user_store)));
+        let banned_token_store = Arc::new(RwLock::new(
+            auth_service::services::HashSetBannedTokenStore::default(),
+        ));
+
+        let app_state = auth_service::app_state::AppState::new(
+            Arc::new(RwLock::new(user_store)),
+            banned_token_store.clone(),
+        );
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
             .expect("Failed to build app");
@@ -38,6 +45,7 @@ impl TestApp {
         // Create new `TestApp` instance and return it
         Self {
             address,
+            banned_token_store,
             cookie_jar,
             http_client,
         }

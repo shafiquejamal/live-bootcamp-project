@@ -72,3 +72,42 @@ async fn should_return_422_if_malformed_input() {
         );
     }
 }
+
+#[tokio::test]
+async fn should_return_401_if_banned_token() {
+    let app = TestApp::new().await;
+
+    let random_email = get_random_email();
+    let signup_request_body = serde_json::json!({
+        "email": random_email,
+        "password": "longenough",
+        "requires2FA": false,
+    });
+    app.post_signup(&signup_request_body).await;
+
+    let login_request_body = serde_json::json!({
+        "email": random_email,
+        "password": "longenough",
+    });
+    let login_response = app.post_login(&login_request_body).await;
+    let token = login_response
+        .cookies()
+        .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
+        .expect(format!("Cookie with name '{}' not found", JWT_COOKIE_NAME).as_str());
+    let token = token.value();
+
+    let logout_response = app.post_logout().await;
+    assert_eq!(logout_response.status().as_u16(), 200,);
+
+    let banned_token_input = serde_json::json!({
+        "token": token
+    });
+
+    let response = app.post_verify_token(&banned_token_input).await;
+    assert_eq!(
+        response.status().as_u16(),
+        401,
+        "failed for input: {:?}",
+        banned_token_input
+    );
+}

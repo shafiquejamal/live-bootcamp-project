@@ -66,13 +66,20 @@ async fn should_return_200_if_valid_jwt_cookie() {
     app.cookie_jar.add_cookie_str(
         &format!(
             "{}={}; HttpOnly; SameSite=Lax; Secure; Path=/",
-            JWT_COOKIE_NAME, token
+            JWT_COOKIE_NAME,
+            token.clone()
         ),
         &Url::parse("http://127.0.0.1").expect("Failed to parse URL"),
     );
 
     let response = app.post_logout().await;
-    assert_eq!(response.status().as_u16(), 200)
+    assert_eq!(response.status().as_u16(), 200);
+    let banned_token_store = app.banned_token_store.read().await;
+    let contains_token = banned_token_store
+        .contains_token(&token)
+        .await
+        .expect("Could not check whether token is banned.");
+    assert!(contains_token);
 }
 
 #[tokio::test]
