@@ -1,6 +1,7 @@
 use app_state::AppState;
 use axum::{
     Json, Router,
+    http::Method,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get_service,
@@ -12,7 +13,7 @@ use domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub mod app_state;
 pub mod domain;
@@ -36,6 +37,8 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::IncorrectCredentials => {
                 (StatusCode::UNAUTHORIZED, "Incorrect credentials")
             }
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "JTW is missing"),
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "JWT is invalid"),
         };
         let body = Json(ErrorResponse {
             error: error_message.to_string(),
@@ -57,6 +60,18 @@ impl Application {
         // Also, remove the `hello` route.
         // We don't need it at this point!
         // DONE
+        let allowed_origins = [
+            "http://localhost:8000".parse()?,
+            // TODO: Replace [YOUR_DROPLET_IP] with your Droplet IP address
+            "http://165.227.82.210:8000".parse()?,
+        ];
+
+        let cors = CorsLayer::new()
+            // Allow GET and POST requests
+            .allow_methods([Method::GET, Method::POST])
+            // Allow cookies to be included in requests
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
         let router = Router::new()
             .nest_service("/", ServeDir::new("assets"))
             .route("/signup", post(routes::signup))
@@ -64,7 +79,8 @@ impl Application {
             .route("/logout", post(routes::logout))
             .route("/verify-token", post(routes::verify_token))
             .route("/verify-2fa", post(routes::verify_2fa))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(cors);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
