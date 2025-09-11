@@ -1,18 +1,15 @@
 use app_state::AppState;
+use axum::routing::post;
 use axum::{
     Json, Router,
     http::Method,
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::get_service,
-    routing::post,
     serve::Serve,
 };
-use axum_extra::extract::cookie::{Cookie, CookieJar};
 use domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
 pub mod app_state;

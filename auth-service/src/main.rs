@@ -8,9 +8,13 @@ use tokio::sync::RwLock;
 async fn main() {
     let user_store = auth_service::services::HashmapUserStore::new();
     let banned_token_store = auth_service::services::HashSetBannedTokenStore::default();
+    let two_fa_code_store = auth_service::services::HashmapTwoFACodeStore::new();
+    let email_client = auth_service::services::MockEmailClient;
     let app_state = auth_service::app_state::AppState::new(
         Arc::new(RwLock::new(user_store)),
         Arc::new(RwLock::new(banned_token_store)),
+        Arc::new(RwLock::new(two_fa_code_store)),
+        Arc::new(RwLock::new(email_client)),
     );
     let app = Application::build(app_state, prod::APP_ADDRESS)
         .await

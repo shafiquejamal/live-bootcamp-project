@@ -1,6 +1,4 @@
-use auth_service::domain::Email;
 use auth_service::utils::JWT_COOKIE_NAME;
-use auth_service::utils::generate_auth_cookie;
 use reqwest::Url;
 
 use crate::helpers::TestApp;
@@ -66,8 +64,7 @@ async fn should_return_200_if_valid_jwt_cookie() {
     app.cookie_jar.add_cookie_str(
         &format!(
             "{}={}; HttpOnly; SameSite=Lax; Secure; Path=/",
-            JWT_COOKIE_NAME,
-            token.clone()
+            JWT_COOKIE_NAME, token
         ),
         &Url::parse("http://127.0.0.1").expect("Failed to parse URL"),
     );

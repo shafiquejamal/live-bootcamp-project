@@ -1,4 +1,4 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::{app_state::AppState, domain::AuthAPIError, utils::validate_token};
