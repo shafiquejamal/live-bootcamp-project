@@ -1,5 +1,7 @@
 use super::{Email, Password, User};
 
+use rand::Rng;
+
 #[async_trait::async_trait]
 pub trait UserStore {
     // TODO: Add the `add_user`, `get_user`, and `validate_user` methods.
@@ -105,7 +107,7 @@ impl Default for TwoFACode {
     fn default() -> Self {
         // Use the `rand` crate to generate a random 2FA code.
         // The code should be 6 digits (ex: 834629)
-        Self(rand::random_range(000_000..=999_999).to_string())
+        Self(rand::thread_rng().gen_range(000_000..=999_999).to_string())
     }
 }
 

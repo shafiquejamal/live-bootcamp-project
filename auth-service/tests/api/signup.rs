@@ -105,7 +105,9 @@ async fn should_return_409_if_email_already_exists() {
         "password": "password123",
         "requires2FA": true
     });
-    app.post_signup(&valid_input).await;
+    let response = app.post_signup(&valid_input).await;
+    assert_eq!(response.status().as_u16(), 201);
+
     let response = app.post_signup(&valid_input).await;
     assert_eq!(response.status().as_u16(), 409);
     assert_eq!(

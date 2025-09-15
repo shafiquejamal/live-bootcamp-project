@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 #[tokio::main]
 async fn main() {
     let pg_pool = configure_postgresql().await;
-    let user_store = auth_service::services::HashmapUserStore::new();
+    let user_store = auth_service::services::PostgresUserStore::new(pg_pool);
     let banned_token_store = auth_service::services::HashSetBannedTokenStore::default();
     let two_fa_code_store = auth_service::services::HashmapTwoFACodeStore::new();
     let email_client = auth_service::services::MockEmailClient;
