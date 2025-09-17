@@ -4,7 +4,7 @@ use crate::helpers::{TestApp, get_random_email};
 
 #[tokio::test]
 async fn should_return_200_valid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email();
     let signup_request_body = serde_json::json!({
@@ -35,11 +35,12 @@ async fn should_return_200_valid_token() {
         "failed for input: {:?}",
         valid_token_input
     );
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let invalid_token = serde_json::json!({
         "token": "bar"
     });
@@ -51,11 +52,12 @@ async fn should_return_401_if_invalid_token() {
         "failed for input: {:?}",
         invalid_token
     );
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
     let input_missing = serde_json::json!({});
     let irrelevant_input = serde_json::json!({
         "foo": "bar"
@@ -71,11 +73,12 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_banned_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email();
     let signup_request_body = serde_json::json!({
@@ -110,4 +113,5 @@ async fn should_return_401_if_banned_token() {
         "failed for input: {:?}",
         banned_token_input
     );
+    app.clean_up().await;
 }
