@@ -11,8 +11,9 @@ async fn main() {
     let pg_pool = configure_postgresql().await;
     let redis_connection = Arc::new(RwLock::new(configure_redis()));
     let user_store = auth_service::services::PostgresUserStore::new(pg_pool);
-    let banned_token_store = auth_service::services::RedisBannedTokenStore::new(redis_connection);
-    let two_fa_code_store = auth_service::services::HashmapTwoFACodeStore::new();
+    let banned_token_store =
+        auth_service::services::RedisBannedTokenStore::new(redis_connection.clone());
+    let two_fa_code_store = auth_service::services::RedisTwoFACodeStore::new(redis_connection);
     let email_client = auth_service::services::MockEmailClient;
     let app_state = auth_service::app_state::AppState::new(
         Arc::new(RwLock::new(user_store)),
