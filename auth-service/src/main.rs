@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use auth_service::utils::constants::prod;
-use auth_service::utils::{DATABASE_URL, REDIS_HOST_NAME};
+use auth_service::utils::{DATABASE_URL, REDIS_HOST_NAME, init_tracing};
 use auth_service::{Application, get_postgres_pool, get_redis_client};
 use sqlx::PgPool;
 use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() {
+    init_tracing();
     let pg_pool = configure_postgresql().await;
     let redis_connection = Arc::new(RwLock::new(configure_redis()));
     let user_store = auth_service::services::PostgresUserStore::new(pg_pool);
