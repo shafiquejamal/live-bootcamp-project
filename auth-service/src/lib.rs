@@ -31,10 +31,11 @@ pub struct ErrorResponse {
 
 impl IntoResponse for AuthAPIError {
     fn into_response(self) -> Response {
+        log_error_chain(&self);
         let (status, error_message) = match self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
-            AuthAPIError::UnexpectedError => {
+            AuthAPIError::UnexpectedError(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
             AuthAPIError::IncorrectCredentials => {
@@ -82,10 +83,10 @@ impl Application {
         let router = Router::new()
             .nest_service("/", ServeDir::new("assets"))
             .route("/signup", post(routes::signup))
-            .route("/login", post(routes::login))
-            .route("/logout", post(routes::logout))
+            // .route("/login", post(routes::login))
+            // .route("/logout", post(routes::logout))
             .route("/verify-token", post(routes::verify_token))
-            .route("/verify-2fa", post(routes::verify_2fa))
+            // .route("/verify-2fa", post(routes::verify_2fa))
             .with_state(app_state)
             .layer(cors)
             // Add a TraceLayer for HTTP requests to enable detailed tracing
@@ -116,4 +117,18 @@ impl Application {
 pub fn get_redis_client(redis_hostname: String) -> RedisResult<Client> {
     let redis_url = format!("redis://{}/", redis_hostname);
     redis::Client::open(redis_url)
+}
+
+fn log_error_chain(e: &(dyn Error + 'static)) {
+    let separator =
+        "\n-----------------------------------------------------------------------------------\n";
+    let mut report = format!("{}{:?}\n", separator, e);
+    let mut current = e.source();
+    while let Some(cause) = current {
+        let str = format!("Caused by:\n\n{:?}", cause);
+        report = format!("{}\n{}", report, str);
+        current = cause.source();
+    }
+    report = format!("{}\n{}", report, separator);
+    tracing::error!("{}", report);
 }

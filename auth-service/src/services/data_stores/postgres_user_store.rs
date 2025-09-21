@@ -10,6 +10,7 @@ use crate::domain::{
     Email, Password, User,
     data_stores::{UserStore, UserStoreError},
 };
+use color_eyre::eyre::{Context, Result, eyre};
 
 pub struct PostgresUserStore {
     pool: PgPool,
@@ -23,12 +24,11 @@ impl PostgresUserStore {
 
 #[async_trait::async_trait]
 impl UserStore for PostgresUserStore {
-    // TODO: Implement all required methods. Note that you will need to make SQL queries against our PostgreSQL instance inside these methods.
     #[tracing::instrument(name = "Adding user to PostgreSQL", skip_all)]
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        let password_hash = compute_password_hash(user.password.as_ref())
+        let password_hash = compute_password_hash(user.password.as_ref().to_owned())
             .await
-            .map_err(|_| UserStoreError::UnexpectedError)?;
+            .map_err(UserStoreError::UnexpectedError)?;
 
         sqlx::query!(
             "INSERT INTO users (email, password_hash, requires_2fa) VALUES ($1, $2, $3)",
@@ -39,7 +39,7 @@ impl UserStore for PostgresUserStore {
         .execute(&self.pool)
         .await
         .map(|_| Ok(()))
-        .map_err(|_| UserStoreError::UserAlreadyExists)?
+        .map_err(|e| UserStoreError::UnexpectedError(e.into()))?
     }
 
     #[tracing::instrument(name = "Retrieving user from PostgreSQL", skip_all)]
@@ -50,11 +50,12 @@ impl UserStore for PostgresUserStore {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|_| UserStoreError::UnexpectedError)?
+        .map_err(|e| UserStoreError::UnexpectedError(e.into()))?
         .map(|row| {
             Ok(User::new(
-                Email::parse(row.email).map_err(|_| UserStoreError::UnexpectedError)?,
-                Password::parse(row.password_hash).map_err(|_| UserStoreError::UnexpectedError)?,
+                Email::parse(row.email).map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
+                Password::parse(row.password_hash)
+                    .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
                 row.requires_2fa,
             ))
         })
@@ -73,9 +74,12 @@ impl UserStore for PostgresUserStore {
             .await
             .map_err(|_| UserStoreError::UserNotFound)?;
 
-        verify_password_hash(user.password.as_ref(), password.as_ref())
-            .await
-            .map_err(|_| UserStoreError::InvalidCredentials)
+        verify_password_hash(
+            user.password.as_ref().to_owned(),
+            password.as_ref().to_owned(),
+        )
+        .await
+        .map_err(|_| UserStoreError::InvalidCredentials)
     }
 }
 
@@ -86,12 +90,10 @@ impl UserStore for PostgresUserStore {
 // will need to update the input parameters to be String types instead of &str
 #[tracing::instrument(name = "Verify password hash", skip_all)]
 async fn verify_password_hash(
-    expected_password_hash: &str,
-    password_candidate: &str,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+    expected_password_hash: String,
+    password_candidate: String,
+) -> Result<()> {
     let current_span: tracing::Span = tracing::Span::current();
-    let expected_password_hash = expected_password_hash.to_string();
-    let password_candidate = password_candidate.to_string();
     let result = tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
             let expected_password_hash: PasswordHash<'_> =
@@ -112,8 +114,7 @@ async fn verify_password_hash(
 // separate thread pool using tokio::task::spawn_blocking. Note that you
 // will need to update the input parameters to be String types instead of &str
 #[tracing::instrument(name = "Computing password hash", skip_all)]
-async fn compute_password_hash(password: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
-    let password = password.to_string();
+async fn compute_password_hash(password: String) -> Result<String> {
     let current_span: tracing::Span = tracing::Span::current(); // New!
     let result = tokio::task::spawn_blocking(move || {
         // This code block ensures that the operations within the closure are executed within the context of the current span.
@@ -128,7 +129,6 @@ async fn compute_password_hash(password: &str) -> Result<String, Box<dyn Error +
             )
             .hash_password(password.as_bytes(), &salt)?
             .to_string();
-
             Ok(password_hash)
         })
     })
