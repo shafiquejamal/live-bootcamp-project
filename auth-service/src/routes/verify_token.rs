@@ -3,13 +3,16 @@ use serde::Deserialize;
 
 use crate::{app_state::AppState, domain::AuthAPIError, utils::validate_token};
 
+#[tracing::instrument(name = "Verify token", skip_all)]
 pub async fn verify_token(
     State(state): State<AppState>,
     Json(request): Json<VerifyTokenRequest>,
 ) -> Result<StatusCode, AuthAPIError> {
     let token = request.token;
 
-    let token_not_valid = validate_token(&token).await.is_err();
+    let token_not_valid = validate_token(&token, state.banned_token_store.clone())
+        .await
+        .is_err();
     if token_not_valid {
         return Err(AuthAPIError::InvalidToken);
     }
