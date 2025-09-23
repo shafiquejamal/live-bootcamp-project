@@ -1,7 +1,6 @@
 use auth_service::app_state::{BannedTokenStoreType, TwoFACodeStoreType};
 use auth_service::services::{
-    HashSetBannedTokenStore, HashmapTwoFACodeStore, MockEmailClient, PostgresUserStore,
-    RedisBannedTokenStore, RedisTwoFACodeStore,
+    MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore,
 };
 use auth_service::utils::DATABASE_URL;
 use auth_service::utils::constants::test;
@@ -9,6 +8,7 @@ use auth_service::utils::env::DEFAULT_REDIS_HOSTNAME;
 use auth_service::{Application, get_postgres_pool, get_redis_client};
 use core::panic;
 use reqwest::cookie::Jar;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::str::FromStr;
@@ -158,14 +158,14 @@ pub fn get_random_email() -> String {
 }
 
 async fn configure_postgresql() -> (PgPool, String) {
-    let postgresql_conn_url = DATABASE_URL.to_owned();
+    let postgresql_conn_url = DATABASE_URL.expose_secret().to_owned();
 
     // We are creating a new database for each test case, and we need to ensure each database has a unique name!
     let db_name = Uuid::new_v4().to_string();
 
     configure_database(&postgresql_conn_url, &db_name).await;
 
-    let postgresql_conn_url_with_db = format!("{}/{}", postgresql_conn_url, db_name);
+    let postgresql_conn_url_with_db = Secret::new(format!("{}/{}", postgresql_conn_url, db_name));
 
     // Create a new connection pool and return it
     (
@@ -212,7 +212,7 @@ fn configure_redis() -> redis::Connection {
 }
 
 async fn delete_database(db_name: &str) {
-    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+    let postgresql_conn_url: String = DATABASE_URL.expose_secret().to_owned();
 
     let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
         .expect("Failed to parse PostgreSQL connection string");

@@ -1,5 +1,6 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use axum_extra::extract::CookieJar;
+use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,7 +15,7 @@ pub async fn login(
     jar: CookieJar,
     Json(request): Json<LoginRequest>,
 ) -> (CookieJar, Result<impl IntoResponse, AuthAPIError>) {
-    let email = match Email::parse(request.email) {
+    let email = match Email::parse(Secret::new(request.email)) {
         Ok(email) => email,
         _ => return (jar, Err(AuthAPIError::InvalidCredentials)),
     };
@@ -68,7 +69,11 @@ async fn handle_2fa(
         .email_client
         .write()
         .await
-        .send_email(&email, "2FA code", &two_fa_code.as_ref().to_string())
+        .send_email(
+            &email,
+            "2FA code",
+            &two_fa_code.as_ref().expose_secret().to_string(),
+        )
         .await
     {
         return (jar, Err(AuthAPIError::UnexpectedError(e)));
@@ -76,7 +81,7 @@ async fn handle_2fa(
 
     let response = Json(LoginResponse::TwoFactorAuth(TwoFactorAuthResponse {
         message: "2FA required".to_owned(),
-        login_attempt_id: login_attempt_id.as_ref().to_string(), // Add the generated login attempt ID
+        login_attempt_id: login_attempt_id.as_ref().expose_secret().to_owned(), // Add the generated login attempt ID
     }));
     // TODO: Return a TwoFactorAuthResponse. The message should be "2FA required".
     // The login attempt ID should be "123456". We will replace this hard-coded login attempt ID soon!
@@ -107,7 +112,7 @@ async fn handle_no_2fa(
 #[derive(Deserialize)]
 pub struct LoginRequest {
     pub email: String,
-    pub password: String,
+    pub password: Secret<String>,
 }
 // The login route can return 2 possible success responses.
 // This enum models each response!

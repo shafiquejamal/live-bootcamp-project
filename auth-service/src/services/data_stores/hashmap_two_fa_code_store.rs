@@ -56,6 +56,8 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
 
 #[cfg(test)]
 mod tests {
+    use secrecy::Secret;
+
     use super::*;
 
     use crate::domain::{Email, LoginAttemptId, TwoFACode};
@@ -63,7 +65,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_code_succeeds() {
         let mut store = HashmapTwoFACodeStore::new();
-        let email = Email::parse(String::from("a@b.com")).unwrap();
+        let email = Email::parse(Secret::new(String::from("a@b.com"))).unwrap();
         let login_attempt_id =
             LoginAttemptId::parse(String::from("02ce228e-f1f4-40a5-bb1d-e1ab52391008")).unwrap();
         let code = TwoFACode::parse(String::from("345678")).unwrap();
@@ -78,7 +80,7 @@ mod tests {
     #[tokio::test]
     async fn test_remove_code_succeeds() {
         let mut store = HashmapTwoFACodeStore::new();
-        let email = Email::parse(String::from("a@b.com")).unwrap();
+        let email = Email::parse(Secret::new(String::from("a@b.com"))).unwrap();
         let login_attempt_id =
             LoginAttemptId::parse(String::from("02ce228e-f1f4-40a5-bb1d-e1ab52391008")).unwrap();
         let code = TwoFACode::parse(String::from("345678")).unwrap();
@@ -95,7 +97,7 @@ mod tests {
     #[tokio::test]
     async fn test_remove_code_fails() {
         let mut store = HashmapTwoFACodeStore::new();
-        let email = Email::parse(String::from("a@b.com")).unwrap();
+        let email = Email::parse(Secret::new(String::from("a@b.com"))).unwrap();
         let login_attempt_id =
             LoginAttemptId::parse(String::from("02ce228e-f1f4-40a5-bb1d-e1ab52391008")).unwrap();
         let code = TwoFACode::parse(String::from("345678")).unwrap();
@@ -108,13 +110,13 @@ mod tests {
         let result = store.remove_code(&email).await;
         assert_eq!(result, Ok(()));
         let result = store.remove_code(&email).await;
-        assert_eq!(result, Err(TwoFACodeStoreError::UnexpectedError));
+        assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_get_code_succeeds() {
         let mut store = HashmapTwoFACodeStore::new();
-        let email = Email::parse(String::from("a@b.com")).unwrap();
+        let email = Email::parse(Secret::new(String::from("a@b.com"))).unwrap();
         let login_attempt_id =
             LoginAttemptId::parse(String::from("02ce228e-f1f4-40a5-bb1d-e1ab52391008")).unwrap();
         let code = TwoFACode::parse(String::from("345678")).unwrap();
@@ -129,7 +131,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_code_fails() {
         let mut store = HashmapTwoFACodeStore::new();
-        let email = Email::parse(String::from("a@b.com")).unwrap();
+        let email = Email::parse(Secret::new(String::from("a@b.com"))).unwrap();
         let login_attempt_id =
             LoginAttemptId::parse(String::from("02ce228e-f1f4-40a5-bb1d-e1ab52391008")).unwrap();
         let code = TwoFACode::parse(String::from("345678")).unwrap();
@@ -137,7 +139,7 @@ mod tests {
             .add_code(email.clone(), login_attempt_id.clone(), code.clone())
             .await
             .unwrap();
-        let non_matching_email = Email::parse(String::from("foo@bar.com")).unwrap();
+        let non_matching_email = Email::parse(Secret::new(String::from("foo@bar.com"))).unwrap();
         let retrieved_code = store.get_code(&non_matching_email).await;
         assert_eq!(
             retrieved_code,

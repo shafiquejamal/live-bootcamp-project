@@ -1,44 +1,64 @@
 use color_eyre::eyre::{Result, eyre};
+use secrecy::{ExposeSecret, Secret};
+#[derive(Clone, Debug)]
+pub struct Password(Secret<String>);
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Password(String);
-
-impl Password {
-    pub fn parse(password: String) -> Result<Password> {
-        if password.len() >= 8 {
-            Ok(Password(password))
-        } else {
-            Err(eyre!(format!("{} is not a valid password", password)))
-        }
+impl PartialEq for Password {
+    fn eq(&self, other: &Self) -> bool {
+        // We can use the expose_secret method to expose the secret in a
+        // controlled manner when needed!
+        self.0.expose_secret() == other.0.expose_secret()
     }
 }
 
-impl AsRef<str> for Password {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
+impl Password {
+    pub fn parse(s: Secret<String>) -> Result<Password> {
+        if validate_password(&s) {
+            Ok(Self(s))
+        } else {
+            Err(eyre!("Failed to parse string to a password type"))
+        }
+    }
+}
+fn validate_password(s: &Secret<String>) -> bool {
+    s.expose_secret().len() >= 8
+}
+impl AsRef<Secret<String>> for Password {
+    fn as_ref(&self) -> &Secret<String> {
+        &self.0
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::Password;
 
-    use super::*;
+    use fake::Fake;
+    use fake::faker::internet::en::Password as FakePassword;
+    use secrecy::Secret; // New!
 
     #[test]
-    pub fn valid_password() {
-        let valid_password = "long enough".to_owned();
-        assert_eq!(
-            Password::parse(valid_password.clone()),
-            Ok(Password(valid_password))
-        )
+    fn empty_string_is_rejected() {
+        let password = Secret::new("".to_string()); // Updated!
+        assert!(Password::parse(password).is_err());
+    }
+    #[test]
+    fn string_less_than_8_characters_is_rejected() {
+        let password = Secret::new("1234567".to_string()); // Updated!
+        assert!(Password::parse(password).is_err());
     }
 
-    #[test]
-    pub fn invalid_password() {
-        let invalid_password = "2short".to_owned();
-        assert_eq!(
-            Password::parse(invalid_password.clone()),
-            Err("2short is not a valid password".to_owned())
-        )
+    #[derive(Debug, Clone)]
+    struct ValidPasswordFixture(pub Secret<String>); // Updated!
+
+    impl quickcheck::Arbitrary for ValidPasswordFixture {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            let password = FakePassword(8..30).fake_with_rng(g);
+            Self(Secret::new(password)) // Updated!
+        }
+    }
+    #[quickcheck_macros::quickcheck]
+    fn valid_passwords_are_parsed_successfully(valid_password: ValidPasswordFixture) -> bool {
+        Password::parse(valid_password.0).is_ok()
     }
 }

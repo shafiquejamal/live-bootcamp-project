@@ -66,14 +66,16 @@ impl UserStore for HashmapUserStore {
 // TODO: Add unit tests for your `HashmapUserStore` implementation
 #[cfg(test)]
 mod tests {
+    use secrecy::Secret;
+
     use super::*;
 
     #[tokio::test]
     async fn test_add_user() {
         let mut user_store = HashmapUserStore::new();
         let user = User {
-            email: Email::parse(String::from("a@test.com")).unwrap(),
-            password: Password::parse(String::from("some-password-1")).unwrap(),
+            email: Email::parse(Secret::new(String::from("a@test.com"))).unwrap(),
+            password: Password::parse(String::from("some-password-1").into()).unwrap(),
             requires_2fa: false,
         };
         let initial_insert_result = user_store.add_user(user.clone()).await;
@@ -88,15 +90,15 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         let user = User {
-            email: Email::parse(String::from("a@test.com")).unwrap(),
-            password: Password::parse(String::from("some-password-1")).unwrap(),
+            email: Email::parse(Secret::new(String::from("a@test.com"))).unwrap(),
+            password: Password::parse(String::from("some-password-1").into()).unwrap(),
             requires_2fa: false,
         };
         let mut users = HashMap::new();
         users.insert(user.email.clone(), user.clone());
         let user_store = HashmapUserStore { users };
         let no_matching_user_result = user_store
-            .get_user(&Email::parse("b@test.com".to_owned()).unwrap())
+            .get_user(&Email::parse(Secret::new("b@test.com".to_owned())).unwrap())
             .await;
         assert_eq!(no_matching_user_result, Err(UserStoreError::UserNotFound));
         let user_exists_result = user_store.get_user(&user.email).await;
@@ -106,8 +108,8 @@ mod tests {
     #[tokio::test]
     async fn test_validate_user() {
         let user = User {
-            email: Email::parse(String::from("a@test.com")).unwrap(),
-            password: Password::parse(String::from("some-password-1")).unwrap(),
+            email: Email::parse(Secret::new(String::from("a@test.com").into())).unwrap(),
+            password: Password::parse(String::from("some-password-1").into()).unwrap(),
             requires_2fa: false,
         };
         let mut users = HashMap::new();
@@ -116,14 +118,14 @@ mod tests {
         let result_invalid = user_store
             .validate_user(
                 &user.email,
-                &Password::parse("wrong-password".to_owned()).unwrap(),
+                &Password::parse("wrong-password".to_owned().into()).unwrap(),
             )
             .await;
         assert_eq!(result_invalid, Err(UserStoreError::InvalidCredentials));
         let result_user_does_not_exist = user_store
             .validate_user(
-                &Email::parse("c@test.com".to_owned()).unwrap(),
-                &Password::parse("some-password-1".to_owned()).unwrap(),
+                &Email::parse(Secret::new("c@test.com".to_owned())).unwrap(),
+                &Password::parse("some-password-1".to_owned().into()).unwrap(),
             )
             .await;
         assert_eq!(

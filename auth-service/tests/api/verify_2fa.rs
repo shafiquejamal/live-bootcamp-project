@@ -1,4 +1,5 @@
 use auth_service::{domain::Email, routes::TwoFactorAuthResponse};
+use secrecy::{ExposeSecret, Secret};
 
 use crate::helpers::{TestApp, get_random_email};
 
@@ -81,7 +82,7 @@ async fn should_return_401_if_old_code() {
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse")
         .login_attempt_id;
-    let email = Email::parse(random_email).unwrap();
+    let email = Email::parse(Secret::new(random_email)).unwrap();
     let (login_attempt_id, old_code) = app
         .two_fa_code_store
         .read()
@@ -89,7 +90,10 @@ async fn should_return_401_if_old_code() {
         .get_code(&email)
         .await
         .unwrap();
-    assert_eq!(old_login_attempt_id, login_attempt_id.as_ref().to_string());
+    assert_eq!(
+        old_login_attempt_id,
+        login_attempt_id.as_ref().expose_secret().to_string()
+    );
 
     let _response2 = app.post_login(&login_body).await;
     let _message2 = _response2
@@ -100,7 +104,7 @@ async fn should_return_401_if_old_code() {
     let test_case = serde_json::json!({
         "email": "a@b.com",
         "loginAttemptId": "1dd67e3b-94e5-46e5-aa10-31f9c7f037e5",
-        "2FACode": old_code.as_ref().to_string(),
+        "2FACode": old_code.as_ref().expose_secret().to_string(),
     });
     let response = app.post_verify_2fa(&test_case).await;
     assert_eq!(response.status().as_u16(), 401);
@@ -136,7 +140,7 @@ async fn should_return_200_if_correct_code() {
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse")
         .login_attempt_id;
-    let email = Email::parse(random_email.clone()).unwrap();
+    let email = Email::parse(Secret::new(random_email.clone())).unwrap();
     let (login_attempt_id_from_store, two_fa_code_from_store) = app
         .two_fa_code_store
         .read()
@@ -146,13 +150,16 @@ async fn should_return_200_if_correct_code() {
         .unwrap();
     assert_eq!(
         login_attempt_id_returned_from_login,
-        login_attempt_id_from_store.as_ref().to_string()
+        login_attempt_id_from_store
+            .as_ref()
+            .expose_secret()
+            .to_string()
     );
 
     let test_case = serde_json::json!({
         "email": random_email,
         "loginAttemptId": login_attempt_id_returned_from_login,
-        "2FACode": two_fa_code_from_store.as_ref().to_string(),
+        "2FACode": two_fa_code_from_store.as_ref().expose_secret().to_string(),
     });
     let response = app.post_verify_2fa(&test_case).await;
     assert_eq!(response.status().as_u16(), 200);
@@ -188,7 +195,7 @@ async fn should_return_401_if_same_code_twice() {
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse")
         .login_attempt_id;
-    let email = Email::parse(random_email.clone()).unwrap();
+    let email = Email::parse(Secret::new(random_email.clone())).unwrap();
     let (login_attempt_id_from_store, two_fa_code_from_store) = app
         .two_fa_code_store
         .read()
@@ -198,13 +205,16 @@ async fn should_return_401_if_same_code_twice() {
         .unwrap();
     assert_eq!(
         login_attempt_id_returned_from_login,
-        login_attempt_id_from_store.as_ref().to_string()
+        login_attempt_id_from_store
+            .as_ref()
+            .expose_secret()
+            .to_string()
     );
 
     let test_case = serde_json::json!({
         "email": random_email,
         "loginAttemptId": login_attempt_id_returned_from_login,
-        "2FACode": two_fa_code_from_store.as_ref().to_string(),
+        "2FACode": two_fa_code_from_store.as_ref().expose_secret().to_string(),
     });
     let response = app.post_verify_2fa(&test_case).await;
     assert_eq!(response.status().as_u16(), 200);

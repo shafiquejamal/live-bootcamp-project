@@ -1,6 +1,7 @@
 use redis::{Commands, Connection};
 
 use color_eyre::eyre::WrapErr;
+use secrecy::{ExposeSecret, Secret};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -22,10 +23,10 @@ impl RedisBannedTokenStore {
 #[async_trait::async_trait]
 impl BannedTokenStore for RedisBannedTokenStore {
     #[tracing::instrument(name = "add banned JWT in redis", skip_all)]
-    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError> {
+    async fn add_token(&mut self, token: Secret<String>) -> Result<(), BannedTokenStoreError> {
         // TODO:
         // 1. Create a new key using the get_key helper function.
-        let key = get_key(&token);
+        let key = get_key(&token.expose_secret());
         // 2. Call the set_ex command on the Redis connection to set a new key/value pair with an expiration time (TTL).
         // The value should simply be a `true` (boolean value).
         // The expiration time should be set to TOKEN_TTL_SECONDS.
@@ -49,8 +50,8 @@ impl BannedTokenStore for RedisBannedTokenStore {
     }
 
     #[tracing::instrument(name = "Check whether JWT is banned (i.e. exists in Redis)", skip_all)]
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
-        let token_key = get_key(token);
+    async fn contains_token(&self, token: &Secret<String>) -> Result<bool, BannedTokenStoreError> {
+        let token_key = get_key(token.expose_secret());
 
         let is_banned: bool = self
             .conn
