@@ -1,12 +1,15 @@
 use auth_service::app_state::{BannedTokenStoreType, TwoFACodeStoreType};
+use auth_service::domain::Email;
 use auth_service::services::{
-    MockEmailClient, PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore,
+    MockEmailClient, PostgresUserStore, PostmarkEmailClient, RedisBannedTokenStore,
+    RedisTwoFACodeStore,
 };
 use auth_service::utils::DATABASE_URL;
 use auth_service::utils::constants::test;
 use auth_service::utils::env::DEFAULT_REDIS_HOSTNAME;
 use auth_service::{Application, get_postgres_pool, get_redis_client};
 use core::panic;
+use reqwest::Client;
 use reqwest::cookie::Jar;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -15,12 +18,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+use wiremock::MockServer;
 
 pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFACodeStoreType,
+    pub email_server: MockServer,
     pub http_client: reqwest::Client,
     pub database_name: String,
     pub clean_up_called: bool,
@@ -35,7 +40,9 @@ impl TestApp {
             redis_connection.clone(),
         )));
         let two_fa_code_store = Arc::new(RwLock::new(RedisTwoFACodeStore::new(redis_connection)));
-        let email_client = Arc::new(RwLock::new(MockEmailClient));
+        let email_server = MockServer::start().await;
+        let base_url = email_server.uri();
+        let email_client = Arc::new(RwLock::new(configure_postmark_email_client(base_url)));
 
         let app_state = auth_service::app_state::AppState::new(
             user_store,
@@ -68,6 +75,7 @@ impl TestApp {
             http_client,
             two_fa_code_store,
             database_name,
+            email_server,
             clean_up_called: false,
         }
     }
@@ -243,4 +251,17 @@ async fn delete_database(db_name: &str) {
         .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
         .await
         .expect("Failed to drop the database.");
+}
+
+fn configure_postmark_email_client(base_url: String) -> PostmarkEmailClient {
+    let postmark_auth_token = Secret::new("auth_token".to_owned());
+
+    let sender = Email::parse(Secret::new(test::email_client::SENDER.to_owned())).unwrap();
+
+    let http_client = Client::builder()
+        .timeout(test::email_client::TIMEOUT)
+        .build()
+        .expect("Failed to build HTTP client");
+
+    PostmarkEmailClient::new(base_url, sender, postmark_auth_token, http_client)
 }
